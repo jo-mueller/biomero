@@ -28,7 +28,7 @@ if [ -e "$file_to_convert" ]; then
     echo "Starting conversion for task $SLURM_ARRAY_TASK_ID..."
 
     # Run the conversion with default parameters
-    singularity run $CONVERSION_PATH/$CONVERTER_IMAGE "$file_to_convert"
+    srun singularity run $CONVERSION_PATH/$CONVERTER_IMAGE "$file_to_convert"
 
     # Remove the original file/folder after conversion
     rm -rf "$file_to_convert"
