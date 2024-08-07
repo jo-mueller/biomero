@@ -12,10 +12,6 @@ echo "DATA_PATH: $DATA_PATH"
 echo "CONVERSION_PATH: $CONVERSION_PATH"
 echo "CONVERTER_IMAGE: $CONVERTER_IMAGE"
 
-# Load any necessary modules or set environment variables
-echo "Loading Singularity/Apptainer..."
-module load singularity || true
-
 # Extract the input file for the current SLURM_ARRAY_TASK_ID
 file_to_convert=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID { $1=""; print substr($0,2) }' "$CONFIG_PATH")
 

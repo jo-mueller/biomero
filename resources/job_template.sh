@@ -44,10 +44,6 @@
 echo "Running $jobname Job w/ $IMAGE_PATH | $SINGULARITY_IMAGE | $DATA_PATH | $SCRIPT_PATH | $DO_CONVERT | \
 	$PARAMS" 
 
-# Load singularity module if needed
-echo "Loading Singularity/Apptainer if needed..."
-module load singularity > /dev/null 2>&1 || true
-
 # WE MOVED THIS CONVERSION LOGIC TO A SEPARATE BIOMERO FUNCTION
 # APPLYING IT HERE HAS A POSSIBILITY TO CLOG THE QUEUE AND TIMEOUT WHILE WAITING
 # SEE https://github.com/Cellular-Imaging-Amsterdam-UMC/NL-BIOMERO/issues/6
