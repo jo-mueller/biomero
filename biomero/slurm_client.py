@@ -496,12 +496,21 @@ class SlurmClient(Connection):
         However, doesn't work properly with unversioned sif.
         """
         cmd = self._CONVERTER_VERSION_CMD.format(
-            converter_path=self.slurm_converters_path),
+            converter_path=self.slurm_converters_path)
         r = self.run_commands([cmd])
         result_dict = {}
         if r.ok:
-            # split lines further into a k,v dict
-            result_dict = {line.rsplit(' ', 1)[0]: line.rsplit(' ', 1)[1] for line in r.stdout.strip().split('\n')}
+            # Iterate over each line in the output
+            for line in r.stdout.strip().split('\n'):
+                # Split the line into key and version
+                key, version = line.rsplit(' ', 1)                
+                # Check if the key already exists in the dictionary
+                if key in result_dict:
+                    # Append the version to the existing list
+                    result_dict[key].append(version)
+                else:
+                    # Create a new list with the version
+                    result_dict[key] = [version]
         return result_dict
         
     def setup_converters(self):
@@ -520,20 +529,23 @@ class SlurmClient(Connection):
             convert_cmds.append(f"mkdir -p \"{self.slurm_converters_path}\"")
         r = self.run_commands(convert_cmds)
         
+        # copy generic job array script over to slurm
+        convert_job_local = files("resources").joinpath(
+            "convert_job_array.sh")
+        _ = self.put(local=convert_job_local,
+                    remote=self.slurm_script_path)
+        
         ## PULL converter if provided in config
         if self.converter_images:
             pull_commands = []
             for path, image in self.converter_images.items():
                 version, image = self.parse_docker_image_version(image)
-                if not version:
-                    # Deferred import to avoid circular dependency
-                    from . import __version__
-                    # use default container version of our package   
-                    version = __version__
                 if version:
                     chosen_converter = f"convert_{path}_{version}.sif"
                 else:
-                    chosen_converter = f"convert_{path}.sif"
+                    version = 'latest'
+                    logger.warning(f"Pulling 'latest' as no version was provided for {image}")
+                    chosen_converter = f"convert_{path}_latest.sif"
                 with self.cd(self.slurm_converters_path):
                     pull_template = "echo 'starting $path $version' >> sing.log\nnohup sh -c \"singularity pull --force --disable-cache $conv_name docker://$image:$version; echo 'finished $path $version'\" >> sing.log 2>&1 & disown"
                     t = Template(pull_template)
@@ -567,11 +579,6 @@ class SlurmClient(Connection):
                             " Check 'sing.log' on Slurm for progress.")
         else:
             ## BUILD converter from singularity def file
-            # copy generic job array script over to slurm
-            convert_job_local = files("resources").joinpath(
-                "convert_job_array.sh")
-            _ = self.put(local=convert_job_local,
-                        remote=self.slurm_script_path)
             # currently known converters
             # 3a. ZARR to TIFF
             # TODO extract these values to e.g. config if we have more
@@ -597,7 +604,7 @@ class SlurmClient(Connection):
                     # EDIT -- NO, then we can't update! Force rebuild!
                     # download /build new container
                     convert_cmds.append(
-                        f"singularity build -F \"{convert_name}.sif\" {convert_def} >> sing.log 2>&1 ; echo 'finished {convert_name}.sif' &")
+                        f"singularity build -F \"{convert_name}_latest.sif\" {convert_def} >> sing.log 2>&1 ; echo 'finished {convert_name}_latest.sif' &")
                 _ = self.run_commands(convert_cmds)
 
     def setup_job_scripts(self):
@@ -1782,7 +1789,7 @@ class SlurmClient(Connection):
             logger.warning(
                 f"Conversion from {source_format} to {target_format} is not supported by default!")
 
-        chosen_converter = f"convert_{source_format}_to_{target_format}.sif"
+        chosen_converter = f"convert_{source_format}_to_{target_format}_latest.sif"
         if self.converter_images:
             image = self.converter_images[f"{source_format}_to_{target_format}"]  
             version, image = self.parse_docker_image_version(image)
